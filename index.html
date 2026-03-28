@@ -268,7 +268,7 @@
 
         async function cargarDashboard() {
             try {
-                const respuesta = await fetch('http://localhost:3000/api/precios');
+                const respuesta = await fetch('https://arbitraje-p2p.onrender.com/api/precios');
                 datosGlobales = await respuesta.json();
 
                 const procesarDatosGrafico = (payType, tradeType) => {
