@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Arbitraje P2P</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f4f4f9; text-align: center; margin: 0; padding: 20px; }
+        
+        /* --- CABECERA Y BOTÓN --- */
+        .header-container { display: flex; justify-content: space-between; align-items: center; max-width: 1200px; margin: 0 auto 20px auto; padding: 0 10px; }
+        h1 { color: #333; margin: 0; }
+        .btn-calc { background-color: #F3BA2F; color: #222; border: none; padding: 10px 20px; font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: background 0.2s, transform 0.1s; }
+        .btn-calc:hover { background-color: #e0a800; transform: scale(1.05); }
+
+        /* --- ESTILOS DEL MODAL (CALCULADORA) --- */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 350px; text-align: left; position: relative; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .close-btn { position: absolute; top: 15px; right: 15px; font-size: 24px; cursor: pointer; color: #aaa; border: none; background: transparent; transition: color 0.2s; }
+        .close-btn:hover { color: #333; }
+        .calc-form { display: flex; flex-direction: column; gap: 15px; margin-top: 20px; }
+        .calc-form label { font-weight: bold; font-size: 14px; color: #555; }
+        .calc-form input { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; width: calc(100% - 22px); }
+        .calc-result { margin-top: 25px; padding: 15px; background: #f9f9f9; border-radius: 8px; text-align: center; border: 1px solid #eee; }
+        .calc-result span { display: block; font-size: 28px; font-weight: bold; margin-top: 5px; color: #333; }
+        .calc-result div { font-size: 14px; color: #666; margin-top: 5px; }
+        .text-verde { color: #02C076 !important; }
+        .text-rojo { color: #F84960 !important; }
+
+        /* --- ESTILOS GENERALES (Gráficos y Mapa) --- */
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .chart-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        @media (max-width: 768px) { .grid-container { grid-template-columns: 1fr; } .header-container { flex-direction: column; gap: 15px; } }
+
+        .control-panel { background: #333; color: white; padding: 15px; border-radius: 8px; max-width: 1200px; margin: 40px auto 20px auto; display: flex; justify-content: center; align-items: center; gap: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .control-panel input { padding: 8px; border-radius: 4px; border: none; font-size: 16px; width: 80px; text-align: center; font-weight: bold;}
+
+        .heatmap-section { margin: 20px auto 40px auto; max-width: 1200px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); overflow-x: auto; }
+        .heatmap-grid { display: grid; grid-template-columns: 60px repeat(7, 1fr); gap: 4px; margin-top: 20px; }
+        .heatmap-cell { padding: 8px 2px; border-radius: 4px; font-size: 13px; color: #333; font-weight: bold; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: transform 0.2s; cursor: pointer; line-height: 1.2; }
+        .heatmap-cell:hover { transform: scale(1.1); border: 1px solid #333; z-index: 10; }
+        .heatmap-header { background-color: #eee; font-weight: bold; }
+        .heatmap-hour { background-color: #f9f9f9; font-weight: bold; text-align: right; padding-right: 10px; flex-direction: row; font-size: 12px;}
+        .porcentaje-txt { font-size: 10px; font-weight: normal; color: #111; }
+    </style>
+</head>
+<body>
+
+    <div class="header-container">
+        <h1>📊 Panel de Arbitraje - Binance P2P</h1>
+        <button class="btn-calc" id="btnAbrirCalculadora">🧮 Calculadora</button>
+    </div>
+    
+    <div class="modal-overlay" id="modalCalculadora">
+        <div class="modal-content">
+            <button class="close-btn" id="btnCerrarCalculadora">&times;</button>
+            <h2 style="margin-top: 0; color: #333;">🧮 Calculadora Rápida</h2>
+            
+            <div class="calc-form">
+                <div>
+                    <label for="inputCompra">1. Compro a (Mi precio SELL):</label>
+                    <input type="number" id="inputCompra" step="0.001" placeholder="Ej: 1.025">
+                </div>
+                <div>
+                    <label for="inputVenta">2. Vendo a (Mi precio BUY):</label>
+                    <input type="number" id="inputVenta" step="0.001" placeholder="Ej: 1.090">
+                </div>
+                <div>
+                    <label for="inputFee">3. Comisión Binance (%):</label>
+                    <input type="number" id="inputFee" step="0.01" value="0.28">
+                </div>
+            </div>
+
+            <div class="calc-result">
+                Ganancia Neta Estimada:
+                <span id="resultadoPorcentaje">0.00%</span>
+                <div id="resultadoDinero">0.000 USD por ciclo</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid-container">
+        <div class="chart-card"><canvas id="ZinliBUY"></canvas></div>
+        <div class="chart-card"><canvas id="ZinliSELL"></canvas></div>
+        <div class="chart-card"><canvas id="WallyBUY"></canvas></div>
+        <div class="chart-card"><canvas id="WallySELL"></canvas></div>
+    </div>
+
+    <div class="control-panel">
+        <label for="feeInput">💰 Comisión Maker Binance (%):</label>
+        <input type="number" id="feeInput" value="0.28" step="0.01" min="0">
+        <span>(Actualiza el mapa de calor)</span>
+    </div>
+
+    <div class="heatmap-section">
+        <h2>🔥 Mapa de Calor - Zinli (Ganancia NETA)</h2>
+        <div id="heatmapZinli" class="heatmap-grid"></div>
+    </div>
+
+    <div class="heatmap-section">
+        <h2>🔥 Mapa de Calor - WallyTech (Ganancia NETA)</h2>
+        <div id="heatmapWally" class="heatmap-grid"></div>
+    </div>
+
+    <script>
+        // ==========================================
+        // LÓGICA DE LA CALCULADORA FLOTANTE
+        // ==========================================
+        const modal = document.getElementById('modalCalculadora');
+        const btnAbrir = document.getElementById('btnAbrirCalculadora');
+        const btnCerrar = document.getElementById('btnCerrarCalculadora');
+
+        // Eventos para abrir y cerrar la ventanita
+        btnAbrir.addEventListener('click', () => modal.style.display = 'flex');
+        btnCerrar.addEventListener('click', () => modal.style.display = 'none');
+        window.addEventListener('click', (e) => { if (e.target === modal) modal.style.display = 'none'; });
+
+        // Cálculos en vivo
+        const inputCompra = document.getElementById('inputCompra');
+        const inputVenta = document.getElementById('inputVenta');
+        const inputFee = document.getElementById('inputFee');
+        const resultadoPorcentaje = document.getElementById('resultadoPorcentaje');
+        const resultadoDinero = document.getElementById('resultadoDinero');
+
+        function calcularEnVivo() {
+            const compra = parseFloat(inputCompra.value);
+            const venta = parseFloat(inputVenta.value);
+            const fee = parseFloat(inputFee.value) || 0;
+
+            // Si los campos están vacíos, reseteamos a cero
+            if(isNaN(compra) || isNaN(venta)) {
+                resultadoPorcentaje.innerText = '0.00%';
+                resultadoPorcentaje.className = '';
+                resultadoDinero.innerText = '0.000 USD por ciclo';
+                return;
+            }
+
+            const feeDecimal = fee / 100;
+            const costoFee = (compra * feeDecimal) + (venta * feeDecimal);
+            const gananciaNeta = (venta - compra) - costoFee;
+            const porcentaje = (gananciaNeta / compra) * 100;
+
+            // Actualizamos los textos en pantalla
+            resultadoPorcentaje.innerText = porcentaje.toFixed(2) + '%';
+            resultadoDinero.innerText = gananciaNeta.toFixed(3) + ' USD por cada dólar';
+
+            // Pintamos de verde si ganamos, rojo si perdemos
+            if(gananciaNeta > 0) {
+                resultadoPorcentaje.className = 'text-verde';
+            } else {
+                resultadoPorcentaje.className = 'text-rojo';
+            }
+        }
+
+        // Cada vez que se escriba un número en cualquiera de los 3 campos, se recalcula automático
+        [inputCompra, inputVenta, inputFee].forEach(input => input.addEventListener('input', calcularEnVivo));
+
+
+        // ==========================================
+        // LÓGICA ORIGINAL DEL DASHBOARD
+        // ==========================================
+        let datosGlobales = [];
+
+        function dibujarGrafico(idCanvas, titulo, etiquetas, datos, colorBorde, colorFondo) {
+            const ctx = document.getElementById(idCanvas).getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: etiquetas,
+                    datasets: [{ label: titulo, data: datos, borderColor: colorBorde, backgroundColor: colorFondo, borderWidth: 2, tension: 0.3, fill: true, pointRadius: 0, pointHitRadius: 10 }]
+                },
+                options: { responsive: true, interaction: { mode: 'index', intersect: false }, scales: { x: { ticks: { maxTicksLimit: 8, maxRotation: 0 } } } }
+            });
+        }
+
+        function generarHeatmap(datos, payType, idContenedor) {
+            const feeInput = parseFloat(document.getElementById('feeInput').value) || 0;
+            const feeDecimal = feeInput / 100;
+
+            const matrizHeatmap = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => ({ buy: [], sell: [] })));
+
+            datos.forEach(reg => {
+                if (reg.payType !== payType) return; 
+                const fecha = new Date(reg.timestamp);
+                let dia = fecha.getDay() - 1; 
+                if (dia === -1) dia = 6; 
+                const hora = fecha.getHours();
+
+                if (reg.tradeType === 'BUY') matrizHeatmap[dia][hora].buy.push(reg.averagePrice);
+                if (reg.tradeType === 'SELL') matrizHeatmap[dia][hora].sell.push(reg.averagePrice);
+            });
+
+            const celdaDatos = Array.from({ length: 7 }, () => Array(24).fill(null));
+            let maxSpreadNeto = -Infinity;
+            let minSpreadNeto = Infinity;
+
+            for(let d=0; d<7; d++){
+                for(let h=0; h<24; h++){
+                    const buys = matrizHeatmap[d][h].buy;
+                    const sells = matrizHeatmap[d][h].sell;
+                    
+                    if(buys.length > 0 && sells.length > 0) {
+                        const avgBuy = buys.reduce((a,b)=>a+b,0) / buys.length;
+                        const avgSell = sells.reduce((a,b)=>a+b,0) / sells.length;
+                        
+                        const spreadBruto = avgBuy - avgSell; 
+                        const costoFee = (avgBuy * feeDecimal) + (avgSell * feeDecimal);
+                        const spreadNeto = spreadBruto - costoFee;
+                        const porcentajeNeto = (spreadNeto / avgSell) * 100;
+                        
+                        celdaDatos[d][h] = { spreadNeto, porcentajeNeto };
+                        
+                        if(spreadNeto > maxSpreadNeto) maxSpreadNeto = spreadNeto;
+                        if(spreadNeto < minSpreadNeto) minSpreadNeto = spreadNeto;
+                    }
+                }
+            }
+
+            const contenedor = document.getElementById(idContenedor);
+            contenedor.innerHTML = '';
+
+            const diasSemana = ['Hora', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+            diasSemana.forEach(d => {
+                const div = document.createElement('div');
+                div.className = 'heatmap-cell heatmap-header';
+                div.innerText = d;
+                contenedor.appendChild(div);
+            });
+
+            for(let h=0; h<24; h++){
+                const divHora = document.createElement('div');
+                divHora.className = 'heatmap-cell heatmap-hour';
+                divHora.innerText = `${h.toString().padStart(2, '0')}:00`;
+                contenedor.appendChild(divHora);
+
+                for(let d=0; d<7; d++){
+                    const data = celdaDatos[d][h];
+                    const celda = document.createElement('div');
+                    celda.className = 'heatmap-cell';
+
+                    if(data !== null) {
+                        celda.innerHTML = `${data.spreadNeto.toFixed(3)} <span class="porcentaje-txt">(${data.porcentajeNeto.toFixed(2)}%)</span>`;
+                        
+                        if(data.spreadNeto < 0) {
+                            celda.style.backgroundColor = 'rgba(255, 99, 132, 0.3)';
+                            celda.style.color = '#900';
+                        } else {
+                            let opacidad = 0.1;
+                            if(maxSpreadNeto > 0) opacidad = 0.1 + 0.9 * (data.spreadNeto / maxSpreadNeto);
+                            celda.style.backgroundColor = `rgba(2, 192, 118, ${opacidad})`;
+                        }
+                        celda.title = `Ganancia Neta: ${data.spreadNeto.toFixed(3)} USD | Retorno: ${data.porcentajeNeto.toFixed(2)}%`;
+                    } else {
+                        celda.innerText = '-';
+                        celda.style.backgroundColor = '#f9f9f9';
+                    }
+                    contenedor.appendChild(celda);
+                }
+            }
+        }
+
+        function actualizarMapas() {
+            if(datosGlobales.length === 0) return;
+            generarHeatmap(datosGlobales, 'Zinli', 'heatmapZinli');
+            generarHeatmap(datosGlobales, 'WallyTech', 'heatmapWally');
+        }
+
+        async function cargarDashboard() {
+            try {
+                const respuesta = await fetch('http://localhost:3000/api/precios');
+                datosGlobales = await respuesta.json();
+
+                const procesarDatosGrafico = (payType, tradeType) => {
+                    const filtrados = datosGlobales.filter(reg => reg.payType === payType && reg.tradeType === tradeType).reverse();
+                    return {
+                        horas: filtrados.map(reg => {
+                            const fecha = new Date(reg.timestamp);
+                            return [fecha.toLocaleString('es-ES', { day: '2-digit', month: '2-digit' }), fecha.toLocaleString('es-ES', { hour: '2-digit', minute: '2-digit' })];
+                        }),
+                        precios: filtrados.map(reg => reg.averagePrice)
+                    };
+                };
+
+                const zinliBuy = procesarDatosGrafico('Zinli', 'BUY');
+                const zinliSell = procesarDatosGrafico('Zinli', 'SELL');
+                const wallyBuy = procesarDatosGrafico('WallyTech', 'BUY');
+                const wallySell = procesarDatosGrafico('WallyTech', 'SELL');
+
+                dibujarGrafico('ZinliBUY', 'Zinli - Maker VENTA', zinliBuy.horas, zinliBuy.precios, '#02C076', 'rgba(2, 192, 118, 0.2)');
+                dibujarGrafico('ZinliSELL', 'Zinli - Maker COMPRA', zinliSell.horas, zinliSell.precios, '#F84960', 'rgba(248, 73, 96, 0.2)');
+                dibujarGrafico('WallyBUY', 'WallyTech - Maker VENTA', wallyBuy.horas, wallyBuy.precios, '#02C076', 'rgba(2, 192, 118, 0.2)');
+                dibujarGrafico('WallySELL', 'WallyTech - Maker COMPRA', wallySell.horas, wallySell.precios, '#F84960', 'rgba(248, 73, 96, 0.2)');
+
+                actualizarMapas();
+
+            } catch (error) {
+                console.error("Error al cargar los datos:", error);
+            }
+        }
+
+        document.getElementById('feeInput').addEventListener('input', actualizarMapas);
+        cargarDashboard();
+    </script>
+</body>
+</html>
