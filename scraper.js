@@ -20,7 +20,7 @@ async function connectDB() {
 const priceSchema = new mongoose.Schema({
     tradeType: String,     // 'BUY' o 'SELL'
     payType: String,       // 'Zinli' o 'WallyTech'
-    top10Prices: [Number], // Lista con los 10 precios exactos
+    top10Prices: [Number], // Se mantiene el nombre para no romper el historial, pero guardará 5 precios
     averagePrice: Number,  // El promedio que calculamos
     timestamp: { type: Date, default: Date.now } // Guarda la fecha y hora exacta automáticamente
 });
@@ -45,7 +45,7 @@ async function fetchP2PData(tradeType, payType, transAmount) {
         tradeType: tradeType,
         payTypes: [payType],
         publisherType: "merchant", // Solo comerciantes verificados (Merchants)
-        rows: 10,                  // Top 10 anuncios
+        rows: 5,                   // <-- AJUSTE: Pedimos el Top 5 a la API
         page: 1,
         transAmount: transAmount   // Filtrar por monto mínimo ($100 compra, $50 venta)
     };
@@ -66,16 +66,19 @@ async function fetchP2PData(tradeType, payType, transAmount) {
             return;
         }
 
+        // <-- AJUSTE: Corte estricto de seguridad para asegurar que solo sean 5
+        const top5Ads = ads.slice(0, 5);
+
         // Extraer los precios y convertirlos a números decimales
-        const prices = ads.map(ad => parseFloat(ad.adv.price));
+        const prices = top5Ads.map(ad => parseFloat(ad.adv.price));
         
-        // Calcular el promedio del Top 10
+        // Calcular el promedio del Top 5
         const sum = prices.reduce((acc, price) => acc + price, 0);
         const average = sum / prices.length;
 
         console.log(`\n--- Resultados para ${payType} | Pestaña Taker: ${tradeType} ---`);
         console.log(`Top ${prices.length} precios:`, prices);
-        console.log(`Precio Promedio: ${average.toFixed(3)} USD`);
+        console.log(`Precio Promedio (Top 5): ${average.toFixed(3)} USD`);
 
         // --- CÓDIGO NUEVO PARA GUARDAR EN MONGODB ---
         const nuevoRegistro = new PriceRecord({
