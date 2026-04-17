@@ -21,6 +21,11 @@ const priceSchema = new mongoose.Schema({
 
 const PriceRecord = mongoose.models.PriceRecord || mongoose.model('PriceRecord', priceSchema);
 
+// ==========================================
+// RUTAS
+// ==========================================
+
+// Ruta pesada: Entrega el historial al Dashboard
 app.get('/api/precios', async (req, res) => {
     try {
         // Aumentamos el límite a 10,000 para traer meses de historial
@@ -32,6 +37,14 @@ app.get('/api/precios', async (req, res) => {
     }
 });
 
+// Ruta súper ligera: SOLO para mantener despierto a Render con el Cronjob
+app.get('/ping', (req, res) => {
+    res.status(200).send('Bot despierto y trabajando 🟢');
+});
+
+// ==========================================
+// INICIO DEL SERVIDOR
+// ==========================================
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Servidor API corriendo en http://localhost:${PORT}`);
